@@ -1,0 +1,120 @@
+/*logo圖片尺寸設定*/
+.logo-img {
+  height: 40px;
+  max-width: 120px;
+  object-fit: contain;
+}
+/*CSS 顏色設定*/
+.priority-low {
+  border-left: 6px solid #81c784; /* 綠 */
+}
+.priority-medium {
+  border-left: 6px solid #ffb74d; /* 橘 */
+}
+.priority-high {
+  border-left: 6px solid #e57373; /* 紅 */
+}
+/*強化整體畫面版型*/
+body {
+  background-color: #f9f9f9;
+  font-family: 'Segoe UI', sans-serif;
+  line-height: 1.6;
+}
+
+.todo-container {
+  max-width: 550px;
+  margin: 60px auto;
+  background-color: #fff;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.todo-container h2 {
+  text-align: center;
+  color: #00796b;
+  margin-bottom: 20px;
+}
+
+.todo-container input, .todo-container select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
+
+.todo-container input {
+  width: 55%;
+  margin-right: 10px;
+}
+
+.todo-container select {
+  width: 25%;
+  margin-right: 10px;
+}
+
+.todo-container button {
+  font-size: 16px;
+  transition: 0.3s;
+}
+
+.todo-container button:hover {
+  filter: brightness(1.1);
+}
+
+.todo-container ul li {
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background-color: #f1f1f1;
+  transition: 0.3s;
+}
+
+.todo-container ul li.done {
+  background-color: #e0e0e0;
+  color: #888;
+  text-decoration: line-through;
+}
+
+.priority-low {
+  border-left: 5px solid #81c784;
+}
+.priority-medium {
+  border-left: 5px solid #ffb74d;
+}
+.priority-high {
+  border-left: 5px solid #e57373;
+}
+
+/* 按鈕區塊樣式統一 */
+.todo-container div button {
+  margin: 4px 4px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background-color: #26a69a;
+  color: white;
+  cursor: pointer;
+}
+
+/* 響應式排版 */
+@media screen and (max-width: 600px) {
+  .todo-container input, .todo-container select {
+    width: 100%;
+    margin: 5px 0;
+  }
+
+  .todo-container {
+    padding: 20px;
+  }
+}
+/*CSS 增強*/
+.drag-over {
+  border: 2px dashed #00796b;
+  background-color: #e0f2f1;
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
