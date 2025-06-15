@@ -240,21 +240,29 @@
         }
 
         function handleDrop(e) {
-        this.classList.remove("drag-over");
-        const dragEndIndex = Array.from(this.parentElement.children).indexOf(this);
-        if (dragStartIndex !== dragEndIndex) {
-            const dragged = tasks[dragStartIndex];
-            tasks.splice(dragStartIndex, 1); // 移除
-            tasks.splice(dragEndIndex, 0, dragged); // 插入新位置
-            saveTasks();
-            renderAllTasks();
-        }
-    }
+          this.classList.remove("drag-over");
+          const dragEndIndex = Array.from(this.parentElement.children).indexOf(this);
+          if (dragStartIndex !== dragEndIndex) {
+            const movedTask = tasks.splice(dragStartIndex, 1)[0];
+            tasks.splice(dragEndIndex, 0, movedTask);
 
-    function renderAllTasks(list = tasks) {
-      document.getElementById("task-list").innerHTML = "";
-      list.forEach(task => renderTask(task));
-    }
+            // ✅ 更新 order_num 並送到後端
+            const ordered = tasks.map((t, i) => ({ id: t.id, order_num: i }));
+            fetch(`${API}/tasks/reorder`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(ordered)
+            }).then(() => {
+              renderAllTasks(); // 重新渲染
+            });
+          }
+        }
+
+
+        function renderAllTasks(list = tasks) {
+          document.getElementById("task-list").innerHTML = "";
+          list.forEach(task => renderTask(task));
+        }
 
   </script>
 </body>

@@ -28,28 +28,42 @@ db.connect(err => {
 });
 
 // 🟩 使用者註冊
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
+
 app.post("/register", (req, res) => {
   const { email, password } = req.body;
-  const sql = "INSERT INTO users (email, password) VALUES (?, ?)";
-  db.query(sql, [email, password], (err) => {
-    if (err) {
-      return res.json({ success: false, message: "帳號已存在或錯誤" });
-    }
-    res.json({ success: true, message: "註冊成功" });
+  bcrypt.hash(password, saltRounds, (err, hash) => {
+    if (err) return res.sendStatus(500);
+    const sql = "INSERT INTO users (email, password) VALUES (?, ?)";
+    db.query(sql, [email, hash], (err) => {
+      if (err) return res.json({ success: false, message: "帳號已存在或錯誤" });
+      res.json({ success: true, message: "註冊成功" });
+    });
   });
 });
+
 
 // 🟦 使用者登入
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
-  const sql = "SELECT * FROM users WHERE email = ? AND password = ?";
-  db.query(sql, [email, password], (err, result) => {
+  const sql = "SELECT * FROM users WHERE email = ?";
+  db.query(sql, [email], (err, result) => {
     if (err || result.length === 0) {
-      return res.json({ success: false, message: "登入失敗，帳密錯誤" });
+      return res.json({ success: false, message: "帳號不存在" });
     }
-    res.json({ success: true });
+
+    const hashedPassword = result[0].password;
+    bcrypt.compare(password, hashedPassword, (err, isMatch) => {
+      if (isMatch) {
+        res.json({ success: true });
+      } else {
+        res.json({ success: false, message: "密碼錯誤" });
+      }
+    });
   });
 });
+
 
 // 🔲 任務儲存在這張表（可放入 SQL 檔）
 const createTaskTable = `
@@ -64,12 +78,18 @@ CREATE TABLE IF NOT EXISTS tasks (
 db.query(createTaskTable);
 
 // 🟨 取得任務
+//API 讓資料按照順序回傳
 app.get("/tasks", (req, res) => {
   const { user } = req.query;
-  db.query("SELECT * FROM tasks WHERE user_email = ?", [user], (err, rows) => {
-    res.json(rows);
-  });
+  db.query(
+    "SELECT * FROM tasks WHERE user_email = ? ORDER BY order_num ASC",
+    [user],
+    (err, rows) => {
+      res.json(rows);
+    }
+  );
 });
+
 
 // 🟧 新增任務
 app.post("/tasks", (req, res) => {
@@ -109,3 +129,21 @@ app.listen(port, () => {
 app.get("/", (req, res) => {
   res.send("✅ ToDo 後端伺服器運作中");
 });
+
+//批次更新任務順序
+app.patch("/tasks/reorder", (req, res) => {
+  const tasks = req.body; // 陣列：[{id: 12, order_num: 0}, ...]
+  const queries = tasks.map(task =>
+    new Promise((resolve, reject) => {
+      db.query("UPDATE tasks SET order_num = ? WHERE id = ?", [task.order_num, task.id], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    })
+  );
+
+  Promise.all(queries)
+    .then(() => res.json({ success: true }))
+    .catch(() => res.sendStatus(500));
+});
+
