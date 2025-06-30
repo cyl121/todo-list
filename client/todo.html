@@ -154,7 +154,7 @@
 
       li.innerHTML = `
         <div style="flex-grow: 1;">
-          <span>${task.text}</span><br/>
+          <span class="task-text" onclick="editTaskText(this, ${task.id})">${task.text}</span><br/>
           ${dueHTML}
         </div>
         <div>
@@ -225,45 +225,78 @@
 
     let dragStartIndex;
 
-        function handleDragStart(e) {
-        dragStartIndex = Array.from(this.parentElement.children).indexOf(this);
-        this.classList.add("dragging");
-        }
+    function handleDragStart(e) {
+      dragStartIndex = Array.from(this.parentElement.children).indexOf(this);
+      this.classList.add("dragging");
+    }
 
-        function handleDragOver(e) {
-        e.preventDefault(); // 允許 drop
-        this.classList.add("drag-over");
-        }
+    function handleDragOver(e) {
+      e.preventDefault(); // 允許 drop
+      this.classList.add("drag-over");
+    }
 
-        function handleDragLeave(e) {
-        this.classList.remove("drag-over");
-        }
+    function handleDragLeave(e) {
+      this.classList.remove("drag-over");
+    }
 
-        function handleDrop(e) {
-          this.classList.remove("drag-over");
-          const dragEndIndex = Array.from(this.parentElement.children).indexOf(this);
-          if (dragStartIndex !== dragEndIndex) {
-            const movedTask = tasks.splice(dragStartIndex, 1)[0];
-            tasks.splice(dragEndIndex, 0, movedTask);
+    function handleDrop(e) {
+      this.classList.remove("drag-over");
+      const dragEndIndex = Array.from(this.parentElement.children).indexOf(this);
+      if (dragStartIndex !== dragEndIndex) {
+        const movedTask = tasks.splice(dragStartIndex, 1)[0];
+        tasks.splice(dragEndIndex, 0, movedTask);
 
-            // ✅ 更新 order_num 並送到後端
-            const ordered = tasks.map((t, i) => ({ id: t.id, order_num: i }));
-            fetch(`${API}/tasks/reorder`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(ordered)
-            }).then(() => {
-              renderAllTasks(); // 重新渲染
-            });
-          }
-        }
+        // ✅ 更新 order_num 並送到後端
+        const ordered = tasks.map((t, i) => ({ id: t.id, order_num: i }));
+        fetch(`${API}/tasks/reorder`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(ordered)
+        }).then(() => {
+            renderAllTasks(); // 重新渲染
+        });
+      }
+    }
 
 
-        function renderAllTasks(list = tasks) {
-          document.getElementById("task-list").innerHTML = "";
-          list.forEach(task => renderTask(task));
-        }
+    function renderAllTasks(list = tasks) {
+      document.getElementById("task-list").innerHTML = "";
+      list.forEach(task => renderTask(task));
+    }
 
+    //加入輸入框編輯
+    function editTaskText(span, id) {
+      const oldText = span.textContent;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = oldText;
+      input.className = "edit-input";
+      span.replaceWith(input);
+      input.focus();
+
+      input.addEventListener("blur", () => saveEdit(input, id));
+      input.addEventListener("keydown", e => {
+        if (e.key === "Enter") saveEdit(input, id);
+      });
+    }
+
+    function saveEdit(input, id) {
+      const newText = input.value.trim();
+      if (newText === "") return;
+      fetch(`${API}/tasks/${id}/text`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newText })
+      })
+        .then(res => res.json())
+        .then(() => {
+          const index = tasks.findIndex(t => t.id == id);
+          tasks[index].text = newText;
+          renderAllTasks(); // 更新畫面
+        });
+    }
+
+    
   </script>
 </body>
 </html>

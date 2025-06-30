@@ -147,3 +147,13 @@ app.patch("/tasks/reorder", (req, res) => {
     .catch(() => res.sendStatus(500));
 });
 
+// ✏️ 更新任務內容
+app.patch("/tasks/:id/text", (req, res) => {
+  const id = req.params.id;
+  const { text } = req.body;
+  db.query("UPDATE tasks SET text = ? WHERE id = ?", [text, id], (err) => {
+    if (err) return res.sendStatus(500);
+    res.json({ success: true });
+  });
+});
+
