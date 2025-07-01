@@ -15,7 +15,8 @@ const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
+  timezone: '+08:00'
 });
 
 // 測試連線
@@ -78,18 +79,28 @@ CREATE TABLE IF NOT EXISTS tasks (
 db.query(createTaskTable);
 
 // 🟨 取得任務
-//API 讓資料按照順序回傳
 app.get("/tasks", (req, res) => {
   const { user } = req.query;
   db.query(
     "SELECT * FROM tasks WHERE user_email = ? ORDER BY order_num ASC",
     [user],
     (err, rows) => {
+      // ⭐ 強制格式化 due 成 yyyy-MM-dd 字串
+      rows.forEach(t => {
+        if (t.due instanceof Date) {
+          // 用 getFullYear/getMonth/getDate，這樣是本地時間
+          const yyyy = t.due.getFullYear();
+          const mm = String(t.due.getMonth() + 1).padStart(2, '0');
+          const dd = String(t.due.getDate()).padStart(2, '0');
+          t.due = `${yyyy}-${mm}-${dd}`;
+        } else if (typeof t.due === "string" && t.due.includes("T")) {
+          t.due = t.due.split("T")[0];
+        }
+      });
       res.json(rows);
     }
   );
 });
-
 
 // 🟧 新增任務
 app.post("/tasks", (req, res) => {
@@ -102,9 +113,9 @@ app.post("/tasks", (req, res) => {
 });
 
 // 🟥 刪除任務
-app.delete("/tasks/:id", (req, res) => {
-  const id = req.params.id;
-  db.query("DELETE FROM tasks WHERE id = ?", [id], (err) => {
+app.delete("/tasks/clear", (req, res) => {
+  const user = req.query.user;
+  db.query("DELETE FROM tasks WHERE user_email = ?", [user], (err) => {
     if (err) return res.sendStatus(500);
     res.json({ success: true });
   });
@@ -152,6 +163,14 @@ app.patch("/tasks/:id/text", (req, res) => {
   const id = req.params.id;
   const { text } = req.body;
   db.query("UPDATE tasks SET text = ? WHERE id = ?", [text, id], (err) => {
+    if (err) return res.sendStatus(500);
+    res.json({ success: true });
+  });
+});
+
+app.delete("/tasks/:id", (req, res) => {
+  const id = req.params.id;
+  db.query("DELETE FROM tasks WHERE id = ?", [id], (err) => {
     if (err) return res.sendStatus(500);
     res.json({ success: true });
   });

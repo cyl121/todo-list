@@ -22,9 +22,30 @@ SHOW TABLES;
 /*新增欄位*/
 ALTER TABLE tasks ADD COLUMN order_num INT DEFAULT 0;
 
-/*更新現有資料的排序*/
+USE todo_app;
+-- 新增欄位：拖曳排序用
+ALTER TABLE tasks ADD COLUMN order_num INT DEFAULT 0;
+
+-- 依照 ID 初始化順序值
 SET @row_num := 0;
 UPDATE tasks SET order_num = (@row_num := @row_num + 1) ORDER BY id;
+
+/*加上安全條件 WHERE 避免觸發 safe mode*/
+SET @row_num := 0;
+UPDATE tasks 
+SET order_num = (@row_num := @row_num + 1)
+WHERE id > 0
+ORDER BY id;
+
+/*檢查 MySQL 的 tasks 表*/
+DESC tasks;
+
+/*查詢時區*/
+SELECT @@global.time_zone, @@session.time_zone;
+/*設定時區*/
+SET GLOBAL time_zone = '+08:00';
+
+SELECT id, text, due FROM tasks ORDER BY id DESC LIMIT 5;
 
 
 

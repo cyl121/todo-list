@@ -92,7 +92,13 @@
     <ul id="task-list"></ul>
   </div>
 
+  <script src="today_due_reminder.js"></script>
   <script>
+
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
     const API = "http://localhost:3000";
     const user = localStorage.getItem("user");
     if (!user) {
@@ -108,17 +114,18 @@
         .then(data => {
           tasks = data;
           renderAllTasks();
+          notifyDueTodayTasks(); // 確保資料載入後才執行提醒
         });
     }
 
-    function saveTasks() {
-        localStorage.setItem("my-tasks", JSON.stringify(tasks));
-    }
+    window.addEventListener("load", loadTasks);
 
     function addTask() {
       const input = document.getElementById("task-input");
       const priority = document.getElementById("priority-select").value;
-      const due = document.getElementById("due-date").value;
+      // 直接取 value，不要 new Date
+      let due = document.getElementById("due-date").value;
+      console.log("🟢 選定的截止日期：", due);
       const text = input.value.trim();
       if (text === "") return;
 
@@ -204,15 +211,17 @@
       });
     }
 
-    window.addEventListener("load", loadTasks);
-    tasks.forEach(task => renderTask(task.text, task.done, task.priority));
-
     function clearTasks() {
-        if (confirm("確定要清空所有任務嗎？")) {
-            tasks = [];
-            document.getElementById("task-list").innerHTML = "";
-            localStorage.removeItem("my-tasks");
-        }
+      if (confirm("確定要清空所有任務嗎？")) {
+        fetch(`${API}/tasks/clear?user=${user}`, {
+          method: "DELETE"
+        })
+        .then(res => res.json())
+        .then(() => {
+          tasks = [];
+          renderAllTasks();
+        });
+      }
     }
 
     function filterTasks(type) {
@@ -258,13 +267,13 @@
       }
     }
 
-
     function renderAllTasks(list = tasks) {
+      const cleaned = list.filter(t => typeof t.due === "string" || t.due === null);
       document.getElementById("task-list").innerHTML = "";
-      list.forEach(task => renderTask(task));
+      cleaned.forEach(task => renderTask(task));
     }
 
-    //加入輸入框編輯
+    // 加入輸入框編輯
     function editTaskText(span, id) {
       const oldText = span.textContent;
       const input = document.createElement("input");
@@ -295,8 +304,6 @@
           renderAllTasks(); // 更新畫面
         });
     }
-
-    
   </script>
 </body>
 </html>
