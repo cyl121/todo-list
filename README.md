@@ -81,6 +81,60 @@ Yu Lang Chou
 
 ## ✅ 備註
 
+---
+
+## 🏆 開發心得 & 技術血淚筆記：MySQL/JS 日期掉一天的終極解法
+
+### 遇到的困難
+
+開發過程遇到「截止日自動提前一天」的經典大坑：
+
+- 前端 `<input type="date">` 選 2025-07-01，資料庫確實存進 2025-07-01
+- 但只要重整網頁，畫面就自動顯示 2025-06-30
+
+### 問題來源
+
+- MySQL 的 DATE 欄位理論上無時區，但 MySQL 驅動查詢會自動轉成 JS Date 物件（預設 UTC）
+- 用 `toISOString().split("T")[0]` 取日期時，會自動轉成 UTC 字串，台灣時區就提前一天
+- 只要 anywhere 用 `new Date(t.due)` 或 `t.due.toISOString()`，就會掉日
+
+### 解決方法
+
+1. 前端/後端/資料庫全程用 `yyyy-mm-dd` 純字串
+2. 後端 API 查出資料後，若是 Date 物件，不要用 `toISOString()`，而是用下列方式：
+
+    ```js
+    if (t.due instanceof Date) {
+      const yyyy = t.due.getFullYear();
+      const mm = String(t.due.getMonth() + 1).padStart(2, '0');
+      const dd = String(t.due.getDate()).padStart(2, '0');
+      t.due = `${yyyy}-${mm}-${dd}`;
+    } else if (typeof t.due === "string" && t.due.includes("T")) {
+      t.due = t.due.split("T")[0];
+    }
+    ```
+
+3. 前端 render 只要直接顯示 `task.due`，不用再 `new Date()`、不用任何型別轉換
+
+---
+
+### 經驗反思
+
+- JS 的 `toISOString()` 會自動轉 UTC、強制扣時區，一不小心就讓台灣的日期提前一天
+- 面對日期型別，絕不能依賴自動轉換，一律手動組年月日
+- 每一個欄位都應該 `console.log(typeof ...)`，確認資料流全程沒型別走樣
+- 解這種 bug，超有成就感，也真的會救到團隊/未來的自己！
+
+---
+
+### 學到什麼
+
+- 簡單的功能，有時候會卡在隱形的型別／時區陷阱
+- 不要只抄網路範例，要多嘗試自己排查，才會真的懂背後的原理
+- 面對任何 bug，系統化、一層層驗證數據來源（payload、資料庫、API 回傳、前端渲染），絕對抓得出來！
+
+---
+
 本作品為學習前後端整合的練習作品，功能從零手刻，無使用框架，日後將嘗試轉為 Vue.js 版本。
 
 This is a practice project for fullstack training, and all logic is implemented manually to build practical experience.
