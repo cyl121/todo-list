@@ -104,9 +104,9 @@ app.get("/tasks", (req, res) => {
 
 // 🟧 新增任務
 app.post("/tasks", (req, res) => {
-  const { user, text, done, priority, due } = req.body;
-  const sql = "INSERT INTO tasks (user_email, text, done, priority, due) VALUES (?, ?, ?, ?, ?)";
-  db.query(sql, [user, text, done, priority, due], (err, result) => {
+  const { user, text, done, priority, due, created } = req.body;
+  const sql = "INSERT INTO tasks (user_email, text, done, priority, due, created) VALUES (?, ?, ?, ?, ?, ?)";
+  db.query(sql, [user, text, done, priority, due, created], (err, result) => {
     if (err) return res.sendStatus(500);
     res.json({ success: true, id: result.insertId });
   });
@@ -175,4 +175,3 @@ app.delete("/tasks/:id", (req, res) => {
     res.json({ success: true });
   });
 });
-

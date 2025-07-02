@@ -72,6 +72,8 @@
 
   <div class="todo-container">
     <h2>📝 我的任務清單</h2>
+    <input type="text" id="search-input" placeholder="搜尋任務..." style="margin-bottom:10px;">
+    <div id="summary-count" style="margin-bottom:10px;"></div>
     <input type="text" id="task-input" placeholder="輸入新任務..." />
     <select id="priority-select">
         <option value="low">低</option>
@@ -90,6 +92,12 @@
     </div>
 
     <ul id="task-list"></ul>
+    <hr>
+    <button id="toggle-completed">顯示已完成任務</button>
+    <ul id="completed-list" style="display: none;"></ul>
+    <hr>
+    <button id="toggle-overdue">顯示逾期任務</button>
+    <ul id="overdue-list" style="display:none;"></ul> 
   </div>
 
   <script src="today_due_reminder.js"></script>
@@ -114,12 +122,13 @@
         .then(data => {
           tasks = data;
           renderAllTasks();
-          notifyDueTodayTasks(); // 確保資料載入後才執行提醒
+          smartRemind(); // 智能提醒
         });
     }
 
-    window.addEventListener("load", loadTasks);
+    window.addEventListener("load", loadTasks);// 頁面載入時載入任務
 
+    // 新增任務
     function addTask() {
       const input = document.getElementById("task-input");
       const priority = document.getElementById("priority-select").value;
@@ -129,7 +138,7 @@
       const text = input.value.trim();
       if (text === "") return;
 
-      const task = { user, text, done: false, priority, due };
+      const task = { user, text, done: false, priority, due, created: (new Date()).toISOString().split("T")[0] };
       fetch(`${API}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -143,39 +152,6 @@
         input.value = "";
         document.getElementById("due-date").value = "";
       });
-    }
-
-    function renderTask(task) {
-      const li = document.createElement("li");
-      li.setAttribute("draggable", true);
-      li.dataset.id = task.id;
-      li.classList.add(`priority-${task.priority}`);
-      if (task.done) li.classList.add("done");
-
-      let dueHTML = "";
-      if (task.due) {
-        const today = new Date().toISOString().split("T")[0];
-        const isOverdue = !task.done && task.due < today;
-        dueHTML = `<small style="color:${isOverdue ? 'red' : '#555'}">截止：${task.due}</small>`;
-      }
-
-      li.innerHTML = `
-        <div style="flex-grow: 1;">
-          <span class="task-text" onclick="editTaskText(this, ${task.id})">${task.text}</span><br/>
-          ${dueHTML}
-        </div>
-        <div>
-          <button onclick="toggleDone(this)">完成</button>
-          <button onclick="removeTask(this)">刪除</button>
-        </div>
-      `;
-
-      li.addEventListener("dragstart", handleDragStart);
-      li.addEventListener("dragover", handleDragOver);
-      li.addEventListener("dragleave", handleDragLeave);
-      li.addEventListener("drop", handleDrop);
-
-      document.getElementById("task-list").appendChild(li);
     }
 
     function toggleDone(btn) {
@@ -303,6 +279,188 @@
           tasks[index].text = newText;
           renderAllTasks(); // 更新畫面
         });
+    }
+
+    // 狀態控制
+    let showCompleted = false;
+    let showOverdue = false;
+    let searchKeyword = "";
+
+    // 搜尋功能
+    document.getElementById("search-input").addEventListener("input", function() {
+      searchKeyword = this.value.trim();
+      renderAllTasks();
+    });
+
+    // 已完成切換
+    document.getElementById("toggle-completed").onclick = function() {
+      showCompleted = !showCompleted;
+      renderAllTasks();
+    };
+    // 逾期切換
+    document.getElementById("toggle-overdue").onclick = function() {
+      showOverdue = !showOverdue;
+      renderAllTasks();
+    };
+
+    // 判斷逾期
+    function isOverdue(task) {
+      if (!task.due || task.done) return false;
+      const today = new Date();
+      const due = new Date(task.due);
+      today.setHours(0,0,0,0);
+      due.setHours(0,0,0,0);
+      return due < today;
+    }
+
+    // 智能提醒
+    function smartRemind() {
+      const todayStr = (new Date()).toISOString().split("T")[0];
+
+      // 1. 今日到期
+      const dueToday = tasks.filter(t => t.due === todayStr && !t.done);
+
+      // 2. 逾期超過 3 天未完成
+      const overdueNDays = tasks.filter(t => {
+        if (!t.due || t.done) return false;
+        const due = new Date(t.due);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        due.setHours(0,0,0,0);
+        const overdueDays = Math.floor((today - due) / (24*60*60*1000));
+        return overdueDays >= 3;
+      });
+
+      // 3. 建立超過 7 天未完成
+      const longUnfinished = tasks.filter(t => {
+        if (!t.created || t.done) return false;
+        const created = new Date(t.created);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        created.setHours(0,0,0,0);
+        const days = Math.floor((today - created) / (24*60*60*1000));
+        return days >= 7;
+      });
+
+      // 4. 推薦「今日重點任務」（優先權最高且今日到期/逾期）
+      const focus = tasks
+        .filter(t => !t.done && (t.due === todayStr || isOverdue(t)))
+        .sort((a, b) => b.priority - a.priority)
+        .slice(0, 1);
+
+      // 彈窗提醒
+      if (dueToday.length > 0) {
+        alert(`📌 今日有 ${dueToday.length} 筆任務到期，請盡快完成！`);
+      }
+      if (overdueNDays.length > 0) {
+        alert(`⚠️ 有 ${overdueNDays.length} 筆任務逾期超過 3 天未完成！`);
+      }
+      if (longUnfinished.length > 0) {
+        alert(`⏰ 有 ${longUnfinished.length} 筆任務建立已超過 7 天還沒完成，建議趕快處理！`);
+      }
+      if (focus.length > 0) {
+        alert(`⭐ 今日優先處理任務：「${focus[0].text}」`);
+      }
+    }
+
+    // 主渲染 function
+    function renderAllTasks() {
+      let filtered = tasks;
+      if (searchKeyword) filtered = filtered.filter(t => t.text.includes(searchKeyword));
+      // 未完成
+      const uncompleted = filtered.filter(t => !t.done && !isOverdue(t));
+      // 已完成
+      const completed = filtered.filter(t => t.done);
+      // 逾期
+      const overdue = filtered.filter(t => isOverdue(t));
+
+      // 總數區
+      document.getElementById("summary-count").textContent =
+        `未完成：${uncompleted.length}，逾期：${overdue.length}，已完成：${completed.length}`;
+
+      // --- 未完成 ---
+      const taskList = document.getElementById("task-list");
+      taskList.innerHTML = "";
+      if (uncompleted.length === 0) {
+        taskList.innerHTML = `<li style="color:#aaa;font-style:italic;">目前沒有未完成任務</li>`;
+      } else {
+        uncompleted.forEach(task => renderTask(task, "task-list"));
+      }
+
+      // --- 已完成 ---
+      const completedList = document.getElementById("completed-list");
+      document.getElementById("toggle-completed").textContent =
+        `${showCompleted ? "隱藏" : "顯示"}已完成任務 (${completed.length})`;
+      completedList.style.display = showCompleted ? "" : "none";
+      completedList.innerHTML = "";
+      document.getElementById("toggle-completed").disabled = (completed.length === 0);
+      if (showCompleted) {
+        if (completed.length === 0) {
+          completedList.innerHTML = `<li style="color:#aaa;font-style:italic;">目前沒有已完成任務</li>`;
+        } else {
+          completed.forEach(task => renderTask(task, "completed-list"));
+        }
+      }
+
+      // --- 逾期 ---
+      const overdueList = document.getElementById("overdue-list");
+      document.getElementById("toggle-overdue").textContent =
+        `${showOverdue ? "隱藏" : "顯示"}逾期任務 (${overdue.length})`;
+      overdueList.style.display = showOverdue ? "" : "none";
+      overdueList.innerHTML = "";
+      document.getElementById("toggle-overdue").disabled = (overdue.length === 0);
+      if (showOverdue) {
+        if (overdue.length === 0) {
+          overdueList.innerHTML = `<li style="color:#aaa;font-style:italic;">目前沒有逾期任務</li>`;
+        } else {
+          overdue.forEach(task => renderTask(task, "overdue-list"));
+        }
+      }
+
+      // --- 頁面初始如有逾期任務自動展開 ---
+      if (overdue.length > 0 && !showOverdue) {
+        showOverdue = true;
+        overdueList.style.display = "";
+        document.getElementById("toggle-overdue").textContent =
+          `隱藏逾期任務 (${overdue.length})`;
+      }
+    }
+
+    // --- 小改 renderTask（可根據需求微調）---
+    function renderTask(task, targetId = "task-list") {
+      const li = document.createElement("li");
+      li.setAttribute("draggable", true);
+      li.dataset.id = task.id;
+      li.classList.add(`priority-${task.priority}`);
+      if (task.done) li.classList.add("done");
+      if (isOverdue(task) && !task.done) li.classList.add("overdue");
+      // 今日高亮
+      const todayStr = (new Date()).toISOString().split("T")[0];
+      if (task.due === todayStr && !task.done) li.classList.add("today-highlight");
+
+      let dueHTML = "";// 處理截止日期顯示
+      if (task.due) {
+        const isOverdueFlag = isOverdue(task);
+        const isToday = task.due === todayStr;
+        dueHTML = `<small style="color:${isOverdueFlag ? 'red' : (isToday ? '#f39c12' : '#555')}">截止：${task.due}</small>`;
+      }
+
+      li.innerHTML = `
+        <div style="flex-grow: 1;">
+          <span class="task-text" onclick="editTaskText(this, ${task.id})">${task.text}</span><br/>
+          ${dueHTML}
+        </div>
+        <div>
+          ${!task.done ? `<button onclick="toggleDone(this)">完成</button>` : ""}
+          <button onclick="removeTask(this)">刪除</button>
+        </div>
+      `;
+      li.addEventListener("dragstart", handleDragStart);
+      li.addEventListener("dragover", handleDragOver);
+      li.addEventListener("dragleave", handleDragLeave);
+      li.addEventListener("drop", handleDrop);
+
+      document.getElementById(targetId).appendChild(li);
     }
   </script>
 </body>

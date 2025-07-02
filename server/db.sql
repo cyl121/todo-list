@@ -21,6 +21,7 @@ SHOW TABLES;
 
 /*新增欄位*/
 ALTER TABLE tasks ADD COLUMN order_num INT DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN created DATE;
 
 USE todo_app;
 -- 新增欄位：拖曳排序用
@@ -46,6 +47,9 @@ SELECT @@global.time_zone, @@session.time_zone;
 SET GLOBAL time_zone = '+08:00';
 
 SELECT id, text, due FROM tasks ORDER BY id DESC LIMIT 5;
+
+
+
 
 
 
